@@ -3,7 +3,6 @@ import * as nodeResolve from 'rollup-plugin-node-resolve';
 import * as commonJs from 'rollup-plugin-commonjs';
 import * as path from 'path';
 import * as log from '../util/log';
-import { ROLLUP_GLOBALS } from '../conf/rollup.globals';
 const ROLLUP_VERSION = (__rollup as any).VERSION;
 
 export type BundleFormat = __rollup.Format;
@@ -13,7 +12,8 @@ export interface RollupOptions {
   entry: string,
   format: BundleFormat,
   dest: string,
-  externals: {[key: string]: string},
+  namedExternals?: { [key: string]: string },
+  embedded?: string[]
 }
 
 /**
@@ -23,37 +23,31 @@ export interface RollupOptions {
  */
 export async function rollup(opts: RollupOptions): Promise<void> {
   log.debug(`rollup (v${ROLLUP_VERSION}) ${opts.entry} to ${opts.dest} (${opts.format})`);
-
-  const globals = {
-    // default externals for '@angular/*' and 'rxjs'
-    ...ROLLUP_GLOBALS,
-    // external symbols passed from the user's ng-package.json
-    ...opts.externals,
+  const embedded: string[] = opts.embedded || [];
+  const namedExternals = {
+    'tslib': 'tslib',
+    ...opts.namedExternals,
   };
-  const globalsKeys = Object.keys(globals);
 
   // Create the bundle
   const bundle: __rollup.Bundle = await __rollup.rollup({
     context: 'this',
-    external: (moduleId) => {
-      const isExplicitExternal = globalsKeys.some((global) => global === moduleId);
-      if (isExplicitExternal === true) {
-        return true;
+    external: moduleId => {
+      // more information about why we don't check for 'node_modules' path
+      // https://github.com/rollup/rollup-plugin-node-resolve/issues/110#issuecomment-350353632
+
+      if (
+        path.isAbsolute(moduleId) ||
+        moduleId.startsWith(".") ||
+        moduleId.startsWith("/") ||
+        moduleId.indexOf("commonjsHelpers") >= 0 || // in case we are embedding a commonjs module we need to include it's helpers also
+        embedded.some(x => x === moduleId)
+      ) {
+        // if it's either 'absolute', marked to embed, starts with a '.' or '/' it's not external
+        return false;
       }
 
-      // Determine from the path
-      if (moduleId.startsWith('/')) {
-        const moduleIdPath = path.parse(moduleId);
-        const entryPath = path.parse(opts.entry);
-
-        // `moduleId` is a file in the sub-tree of `opts.entry` -> inline to bundle
-        if (moduleIdPath.dir.startsWith(entryPath.dir)) {
-          return false;
-        }
-      }
-
-      // XX: by default, the referenced module is inlined
-      return false;
+      return true;
     },
     input: opts.entry,
     plugins: [
@@ -77,7 +71,44 @@ export async function rollup(opts: RollupOptions): Promise<void> {
     file: opts.dest,
     format: opts.format,
     banner: '',
-    globals: globals,
+    globals: (moduleId => {
+      let regMatch;
+      if (regMatch = /^\@angular\/platform-browser-dynamic(\/?.*)/.exec(moduleId)) {
+        return `ng.platformBrowserDynamic${regMatch[1]}`.replace("/", ".")
+      }
+
+      if (regMatch = /^\@angular\/platform-browser(\/?.*)/.exec(moduleId)) {
+        return `ng.platformBrowser${regMatch[1]}`.replace("/", ".")
+      }
+
+      if (regMatch = /^\@angular\/(.+)/.exec(moduleId)) {
+        return `ng.${regMatch[1]}`.replace("/", ".")
+      }
+
+      if (/^rxjs\/[^\/]+$/.test(moduleId)) {
+        return "Rx";
+      }
+
+      if (/^rxjs\/(add\/)?observable/.test(moduleId)) {
+        return "Rx.Observable";
+      }
+
+      if (/^rxjs\/scheduler/.test(moduleId)) {
+        return "Rx.Scheduler";
+      }
+
+      if (/^rxjs\/symbol/.test(moduleId)) {
+        return "Rx.Symbol";
+      }
+
+      if (/^rxjs\/(add\/)?operator/.test(moduleId)) {
+        return "Rx.Observable.prototype";
+      }
+
+      return namedExternals[moduleId]; // leave it up to rollup to guess the global name
+    }) as any,
+    // the above is casted as any because of missing types
+    // https://github.com/DefinitelyTyped/DefinitelyTyped/pull/22097
     sourcemap: true
   });
 }
