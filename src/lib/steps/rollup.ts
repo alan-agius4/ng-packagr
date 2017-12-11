@@ -3,7 +3,6 @@ import * as nodeResolve from 'rollup-plugin-node-resolve';
 import * as commonJs from 'rollup-plugin-commonjs';
 import * as path from 'path';
 import * as log from '../util/log';
-const ROLLUP_VERSION = (__rollup as any).VERSION;
 
 export type BundleFormat = __rollup.Format;
 
@@ -22,7 +21,7 @@ export interface RollupOptions {
  * @param opts
  */
 export async function rollup(opts: RollupOptions): Promise<void> {
-  log.debug(`rollup (v${ROLLUP_VERSION}) ${opts.entry} to ${opts.dest} (${opts.format})`);
+  log.debug(`rollup (v${__rollup.VERSION}) ${opts.entry} to ${opts.dest} (${opts.format})`);
   const embedded: string[] = opts.embedded || [];
   const namedExternals = {
     'tslib': 'tslib',
@@ -71,7 +70,7 @@ export async function rollup(opts: RollupOptions): Promise<void> {
     file: opts.dest,
     format: opts.format,
     banner: '',
-    globals: (moduleId => {
+    globals: moduleId => {
       let regMatch;
       if (regMatch = /^\@angular\/platform-browser-dynamic(\/?.*)/.exec(moduleId)) {
         return `ng.platformBrowserDynamic${regMatch[1]}`.replace("/", ".")
@@ -105,10 +104,8 @@ export async function rollup(opts: RollupOptions): Promise<void> {
         return "Rx.Observable.prototype";
       }
 
-      return namedExternals[moduleId]; // leave it up to rollup to guess the global name
-    }) as any,
-    // the above is casted as any because of missing types
-    // https://github.com/DefinitelyTyped/DefinitelyTyped/pull/22097
+      return namedExternals[moduleId] || ''; // leave it up to rollup to guess the global name
+    },
     sourcemap: true
   });
 }
