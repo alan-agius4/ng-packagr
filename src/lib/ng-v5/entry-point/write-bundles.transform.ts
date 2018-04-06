@@ -37,11 +37,16 @@ export const writeBundlesTransform: Transform = pipe(
     };
 
     const { destinationFiles } = entryPoint.data;
-    return fromPromise(writeFlatBundleFiles(destinationFiles, opts)).pipe(map(() => graph));
+    const { bundledDependencies } = ngEntryPoint.packageJson;
+    return fromPromise(writeFlatBundleFiles(destinationFiles, opts, bundledDependencies)).pipe(map(() => graph));
   })
 );
 
-async function writeFlatBundleFiles(destinationFiles: DestinationFiles, opts: FlattenOpts): Promise<void> {
+async function writeFlatBundleFiles(
+  destinationFiles: DestinationFiles,
+  opts: FlattenOpts,
+  bundledDependencies?: string[]
+): Promise<void> {
   const { esm2015, fesm2015, esm5, fesm5, umd, umdMinified } = destinationFiles;
 
   log.info('Bundling to FESM2015');
@@ -62,7 +67,8 @@ async function writeFlatBundleFiles(destinationFiles: DestinationFiles, opts: Fl
   await flattenToUmd({
     ...opts,
     entryFile: fesm5,
-    destFile: umd
+    destFile: umd,
+    bundledDependencies
   });
 
   log.info('Minifying UMD bundle');

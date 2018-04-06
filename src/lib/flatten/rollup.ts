@@ -1,4 +1,5 @@
 import * as rollup from 'rollup';
+import * as commonJs from 'rollup-plugin-commonjs';
 import * as nodeResolve from 'rollup-plugin-node-resolve';
 import * as log from '../util/log';
 import { externalModuleIdStrategy } from './external-module-id-strategy';
@@ -18,6 +19,7 @@ export interface RollupOptions {
   umdModuleIds?: { [key: string]: string };
   amd?: { id: string };
   transform?: TransformHook;
+  bundledDependencies?: string[];
 }
 
 /** Runs rollup over the given entry file, writes a bundle file. */
@@ -27,9 +29,9 @@ export async function rollupBundleFile(opts: RollupOptions): Promise<void> {
   // Create the bundle
   const bundle: rollup.OutputChunk = await rollup.rollup({
     context: 'this',
-    external: moduleId => externalModuleIdStrategy(moduleId),
+    external: moduleId => externalModuleIdStrategy(moduleId, opts.bundledDependencies),
     input: opts.entry,
-    plugins: [nodeResolve(), { transform: opts.transform }],
+    plugins: [nodeResolve(), commonJs(), { transform: opts.transform }],
     onwarn: warning => {
       if (typeof warning === 'string') {
         log.warn(warning);

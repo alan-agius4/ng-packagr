@@ -18,6 +18,8 @@ export interface FlattenOpts {
 
   /** Map of external UMD module IDs (dependencies).  */
   umdModuleIds?: { [key: string]: string };
+
+  bundledDependencies?: string[];
 }
 
 export async function flattenToFesm(opts: FlattenOpts): Promise<void> {
@@ -39,7 +41,8 @@ export async function flattenToUmd(opts: FlattenOpts): Promise<void> {
     amd: { id: opts.amdId },
     umdModuleIds: {
       ...opts.umdModuleIds
-    }
+    },
+    bundledDependencies: opts.bundledDependencies
   });
 }
 

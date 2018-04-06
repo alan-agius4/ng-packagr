@@ -43,6 +43,17 @@ export const writePackageTransform: Transform = transformFromPromise(async graph
   // we only want to create the 'tgz' file for the when it's the last one in progress
   // as when having multiple entry points this will cause invalid tgz files.
   if (isLastInProgress) {
+    const { bundledDependencies = [] } = ngEntryPoint.packageJson;
+    bundledDependencies.forEach(async moduleName => {
+      // we do this so that in the final tgz we have the bundled deps without
+      // the need to `npm pack` as this will cause an `npm i`
+      const modulePath = require.resolve(`${moduleName}/package.json`);
+      await copyFiles(
+        `${path.dirname(modulePath)}/**/*`,
+        path.join(ngPackage.primary.destinationPath, 'node_modules', moduleName)
+      );
+    });
+
     log.info('Creating package .tgz');
     _tar(`${ngPackage.primary.basePath}/dist.tgz`, ngPackage.primary.destinationPath);
   }
