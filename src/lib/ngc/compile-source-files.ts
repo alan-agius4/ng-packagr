@@ -7,12 +7,16 @@ import { TsConfig } from '../ts/tsconfig';
 import * as log from '../util/log';
 import { createEmitCallback } from './create-emit-callback';
 import { redirectWriteFileCompilerHost } from '../ts/redirect-write-file-compiler-host';
+import { watchCompilerHost } from '../watch/watch-compiler-host';
 
 export async function compileSourceFiles(
   sourceFiles: ts.SourceFile[],
   tsConfig: TsConfig,
   outDir?: string,
-  declarationDir?: string
+  declarationDir?: string,
+  program?: ng.Program,
+  compilerHost?: ng.CompilerHost,
+  fileCache?: any
 ) {
   log.debug(`ngc (v${ng.VERSION.full})`);
 
@@ -21,24 +25,24 @@ export async function compileSourceFiles(
     tsConfigOptions.outDir = outDir;
   }
 
-  // ts.CompilerHost
-  let tsCompilerHost = createCompilerHostForSynthesizedSourceFiles(sourceFiles, tsConfigOptions);
+  // ng.CompilerHost
+  let ngCompilerHost: ng.CompilerHost;
+  if (compilerHost) {
+    ngCompilerHost = compilerHost;
+  } else {
+  let ngCompilerHost = createCompilerHostForSynthesizedSourceFiles(sourceFiles, tsConfigOptions);
   if (declarationDir) {
-    tsCompilerHost = redirectWriteFileCompilerHost(tsCompilerHost, tsConfig.options.baseUrl, declarationDir);
+    ngCompilerHost = redirectWriteFileCompilerHost(ngCompilerHost, tsConfig.options.baseUrl, declarationDir);
   }
 
-  // ng.CompilerHost
-  const ngCompilerHost = ng.createCompilerHost({
-    options: tsConfigOptions,
-    tsHost: tsCompilerHost
-  });
+  ngCompilerHost = watchCompilerHost(fileCache, ngCompilerHost);
 
-  // ngc
   const result = ng.performCompilation({
     rootNames: tsConfig.rootNames,
     options: tsConfigOptions,
     emitCallback: createEmitCallback(tsConfigOptions),
     host: ngCompilerHost
+    // oldProgram: program
   });
 
   const flatModuleFile = tsConfigOptions.flatModuleOutFile;
@@ -54,5 +58,7 @@ export async function compileSourceFiles(
   }
 
   const exitCode = ng.exitCodeFromResult(result.diagnostics);
-  return exitCode === 0 ? Promise.resolve() : Promise.reject(new Error(ng.formatDiagnostics(result.diagnostics)));
+  return exitCode === 0
+    ? Promise.resolve({ program: result.program as any, compilerHost: ngCompilerHost as any })
+    : Promise.reject(new Error(ng.formatDiagnostics(result.diagnostics)));
 }

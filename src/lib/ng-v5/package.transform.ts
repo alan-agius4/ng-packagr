@@ -1,9 +1,11 @@
+import * as chokidar from 'chokidar';
 import * as path from 'path';
 import { Observable } from 'rxjs/Observable';
 import { concat as concatStatic } from 'rxjs/observable/concat';
 import { fromPromise } from 'rxjs/observable/fromPromise';
 import { of as observableOf } from 'rxjs/observable/of';
-import { concatMap, map, retry, switchMap, takeLast, tap } from 'rxjs/operators';
+import { concatMap, map, retry, switchMap, takeLast, tap, takeUntil, merge } from 'rxjs/operators';
+import { combineLatest } from 'rxjs/observable/combineLatest';
 import { pipe } from 'rxjs/util/pipe';
 import { BuildGraph } from '../brocc/build-graph';
 import { DepthBuilder, Groups } from '../brocc/depth';
@@ -14,7 +16,13 @@ import { copyFiles } from '../util/copy';
 import { rimraf } from '../util/rimraf';
 import { PackageNode, EntryPointNode, ngUrl, isEntryPoint, byEntryPoint } from './nodes';
 import { discoverPackages } from './discover-packages';
-
+import { NgPackage } from '../ng-package-format/package';
+import { takeWhile } from 'rxjs/operators/takeWhile';
+import { mergeMap } from 'rxjs/operators/mergeMap';
+import { mapTo } from 'rxjs/operators/mapTo';
+import { mergeMapTo } from 'rxjs/operators/mergeMapTo';
+import { watchFile } from 'fs-extra';
+import { WatchFileCache, CacheEntry } from '../watch/watch-compiler-host';
 /**
  * A transformation for building an npm package:
  *
@@ -38,12 +46,25 @@ export const packageTransformFactory = (
 ) => (source$: Observable<BuildGraph>): Observable<BuildGraph> => {
   const pkgUri = ngUrl(project);
 
-  return source$.pipe(
+  return combineLatest(source$, createWatcher(project)).pipe(
     tap(() => {
       log.info(`Building Angular Package`);
     }),
+    tap(([graph, fileWatched]) => {
+      const ngPkg = graph.get(pkgUri) as PackageNode;
+      console.log('file changed');
+      if (ngPkg) {
+        const file = path.resolve(fileWatched.replace(/\\/g, '/'));
+        ngPkg.data.watchFileCache.delete(file);
+      }
+    }),
+    map(([graph, watcher]) => graph),
     // Discover packages and entry points
-    switchMap(graph => {
+    switchMap((graph: BuildGraph) => {
+      if (graph.size) {
+        return observableOf(graph);
+      }
+
       const pkg = discoverPackages({ project });
 
       return fromPromise(pkg).pipe(
@@ -56,12 +77,12 @@ export const packageTransformFactory = (
       );
     }),
     // Clean the primary dest folder (should clean all secondary sub-directory, as well)
-    switchMap(graph => {
-      const { dest, deleteDestPath } = graph.get(pkgUri).data;
-      return fromPromise(deleteDestPath ? rimraf(dest) : Promise.resolve());
-    }, (graph, _) => graph),
+    // switchMap((graph: BuildGraph) => {
+    //   const { dest, deleteDestPath } = graph.get(pkgUri).data;
+    //   return fromPromise(deleteDestPath ? rimraf(dest) : Promise.resolve());
+    // }, (graph, _) => graph),
     // Add entry points to graph
-    map(graph => {
+    map((graph: BuildGraph) => {
       const ngPkg = graph.get(pkgUri);
 
       const generateOutDirPath = (folder: string) => path.join(ngPkg.data.dest, folder);
@@ -85,7 +106,7 @@ export const packageTransformFactory = (
     scheduleEntryPoints(entryPointTransform),
     // Write npm package to dest folder
     writeNpmPackage(pkgUri),
-    tap(graph => {
+    tap((graph: BuildGraph) => {
       const ngPkg = graph.get(pkgUri);
       log.success(`Built Angular Package!
 - from: ${ngPkg.data.src}
@@ -143,3 +164,15 @@ const scheduleEntryPoints = (epTransform: Transform): Transform =>
       return concatStatic(...eps$).pipe(takeLast(1));
     })
   );
+
+const createWatcher = project => {
+  const watcher = chokidar.watch(path.resolve(path.dirname(project)), {
+    ignoreInitial: true,
+    ignored: /((^[\/\\])\..)|(\.js$)|(\.map$)|(dist$)|(\.metadata\.json)/,
+    persistent: true,
+    interval: 100,
+    awaitWriteFinish: true
+  });
+
+  return Observable.create(observer => watcher.on('all', (event: string, filePath: string) => observer.next(filePath)));
+};

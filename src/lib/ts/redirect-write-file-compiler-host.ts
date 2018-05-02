@@ -28,7 +28,8 @@ export function redirectWriteFileCompilerHost(
         const projectRelativePath = path.relative(baseDir, fileName);
         filePath = path.resolve(declarationDir, projectRelativePath);
       }
-      fs.outputFileSync(filePath, data);
+
+      compilerHost.writeFile.call(this, filePath, data);
     }
   };
 }
