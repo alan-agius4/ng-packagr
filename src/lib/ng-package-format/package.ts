@@ -1,6 +1,7 @@
 import * as path from 'path';
 import { NgEntryPoint } from './entry-point';
 import { DirectoryPath } from './shared';
+import { CacheEntry } from '../watch/watch-compiler-host';
 
 /**
  * A package being built. Quoting Angular Package Format, a package is:
@@ -60,6 +61,8 @@ export class NgPackage {
   public get dest(): DirectoryPath {
     return this.absolutePathFromPrimary('dest');
   }
+
+  public watchFileCache = new Map<string, CacheEntry>();
 
   public get keepLifecycleScripts(): boolean {
     return this.primary.$get('keepLifecycleScripts') === true;

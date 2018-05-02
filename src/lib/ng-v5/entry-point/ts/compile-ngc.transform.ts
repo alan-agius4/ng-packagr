@@ -10,12 +10,15 @@ import {
   isEntryPoint,
   EntryPointNode
 } from '../../nodes';
+import { NgEntryPoint } from '../../../ng-package-format/entry-point';
+import { NgPackage } from '../../../ng-package-format/package';
 
 export const compileNgcTransform: Transform = transformFromPromise(async graph => {
   log.info(`Compiling TypeScript sources through ngc`);
   const entryPoint = graph.find(isEntryPointInProgress()) as EntryPointNode;
   const tsSources = entryPoint.find(isTypeScriptSources) as TypeScriptSourceNode;
   const tsConfig: TsConfig = entryPoint.data.tsConfig;
+  const ngPackage: NgPackage = graph.find(node => node.type === 'application/ng-package').data;
 
   // Add paths mappings for dependencies
   const entryPointDeps = entryPoint.filter(isEntryPoint) as EntryPointNode[];
@@ -40,7 +43,19 @@ export const compileNgcTransform: Transform = transformFromPromise(async graph =
   // Compile TypeScript sources
   const { esm2015, declarations } = entryPoint.data.destinationFiles;
   const previousTransform = tsSources.data;
-  await compileSourceFiles(tsSources.data.transformed, tsConfig, path.dirname(esm2015), path.dirname(declarations));
+  const { program, compilerHost } = entryPoint.data.entryPoint as any;
+  const x = await compileSourceFiles(
+    tsSources.data.transformed,
+    tsConfig,
+    path.dirname(esm2015),
+    path.dirname(declarations),
+    program,
+    compilerHost,
+    ngPackage.watchFileCache
+  );
+
+  (entryPoint.data.entryPoint as any).program = x.program;
+  (entryPoint.data.entryPoint as any).compilerHost = x.compilerHost;
   previousTransform.dispose();
 
   return graph;

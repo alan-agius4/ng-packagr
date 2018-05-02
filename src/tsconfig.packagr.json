@@ -11,16 +11,8 @@
     "outDir": "../dist",
     "experimentalDecorators": true,
     "noEmitOnError": true,
-    "noImplicitAny": false,
-    "types": [
-      "node"
-    ]
+    "noImplicitAny": false
   },
-  "files": [
-    "cli/main.ts",
-    "public_api.ts"
-  ],
-  "exclude": [
-    "**/*.spec.ts"
-  ]
+  "files": ["cli/main.ts", "public_api.ts"],
+  "exclude": ["**/*.spec.ts"]
 }

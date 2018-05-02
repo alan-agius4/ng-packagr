@@ -84,7 +84,7 @@ export class NgPackagr {
     return observableOf(new BuildGraph())
       .pipe(
         buildTransformOperator,
-        take(1),
+        // take(1),
         catchError(err => {
           // Report error and re-throw to subscribers
           log.error(err);
