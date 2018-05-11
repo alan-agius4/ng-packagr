@@ -6,10 +6,14 @@ import { transformSourceFiles } from '../../ngc/transform-source-files';
 import { analyseDependencies } from '../../ts/analyse-dependencies-transformer';
 import { transformComponentSourceFiles } from '../../ts/ng-component-transformer';
 import { isEntryPoint, TemplateNode, StylesheetNode, TypeScriptSourceNode, fileUrl, tsUrl } from '../nodes';
+import {  WatchFileCache, CacheEntry } from '../../ts/watch-compiler-host';
+import { NgPackage } from '../../ng-package-format/package';
 
 export const analyseSourcesTransform: Transform = pipe(
   map(graph => {
     const entryPoints = graph.filter(isEntryPoint);
+    const ngPackage: NgPackage = graph.find(node => node.type === 'application/ng-package').data;
+    
     for (let entryPoint of entryPoints) {
       log.debug(`Analysing sources for ${entryPoint.data.entryPoint.moduleId}`);
 
@@ -43,9 +47,9 @@ export const analyseSourcesTransform: Transform = pipe(
         }
       });
 
-      // TODO: a typescript `SourceFile` may also be added as individual nod to the graph
+      // TODO: a typescript `SourceFile` may also be added as individual node to the graph
       const tsSourcesNode = new TypeScriptSourceNode(tsUrl(entryPoint.data.entryPoint.moduleId));
-      tsSourcesNode.data = transformSourceFiles(entryPoint.data.tsConfig, [extractResources, extractDependencies]);
+      tsSourcesNode.data = transformSourceFiles(entryPoint.data.tsConfig, [extractResources, extractDependencies], ngPackage.watchFileCache);
       graph.put(tsSourcesNode);
       entryPoint.dependsOn(tsSourcesNode);
     }

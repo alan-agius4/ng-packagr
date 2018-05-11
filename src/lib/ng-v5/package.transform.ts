@@ -1,6 +1,7 @@
+import * as chokidar from 'chokidar';
 import * as path from 'path';
-import { Observable, concat as concatStatic, from as fromPromise, of as observableOf, pipe } from 'rxjs';
-import { concatMap, map, retry, switchMap, takeLast, tap } from 'rxjs/operators';
+import { Observable, concat as concatStatic, from as fromPromise, of as observableOf, pipe, combineLatest } from 'rxjs';
+import { concatMap, map, retry, switchMap, takeLast, tap, mapTo } from 'rxjs/operators';
 import { BuildGraph } from '../brocc/build-graph';
 import { DepthBuilder, Groups } from '../brocc/depth';
 import { Node, STATE_IN_PROGESS } from '../brocc/node';
@@ -34,7 +35,7 @@ export const packageTransformFactory = (
 ) => (source$: Observable<BuildGraph>): Observable<BuildGraph> => {
   const pkgUri = ngUrl(project);
 
-  return source$.pipe(
+  const build$ = source$.pipe(
     tap(() => {
       log.info(`Building Angular Package`);
     }),
@@ -86,6 +87,32 @@ export const packageTransformFactory = (
 - to:   ${ngPkg.data.dest}`);
     })
   );
+
+  const watch$ = createWatcher(project);
+  const x = combineLatest(
+      build$,
+      watch$
+    ).pipe(
+      tap(([graph, fileWatched]) => {
+        console.log('file changed');
+        const ngPkg = graph.get(pkgUri);
+        if (ngPkg) {
+          const file = path.resolve(fileWatched.replace(/\\/g, '/'));
+          ngPkg.data.watchFileCache.delete(file);
+        }
+      }),
+      map(([graph, fileWatched]) => {
+        return graph;
+      }),
+      tap(graph => {
+        const entryPoints = graph.filter(isEntryPoint);
+        entryPoints.forEach(x => x.state = 'dirty')
+      }),
+      analyseSourcesTransform,
+      scheduleEntryPoints(entryPointTransform),
+    )
+
+  return x || build$;
 };
 
 const writeNpmPackage = (pkgUri: string): Transform =>
@@ -137,3 +164,16 @@ const scheduleEntryPoints = (epTransform: Transform): Transform =>
       return concatStatic(...eps$).pipe(takeLast(1));
     })
   );
+
+
+const createWatcher = project => {
+  const watcher = chokidar.watch(path.resolve(path.dirname(project)), {
+    ignoreInitial: true,
+    ignored: /((^[\/\\])\..)|(\.js$)|(\.map$)|(dist$)|(\.metadata\.json)/,
+    persistent: true,
+    interval: 100,
+    awaitWriteFinish: true
+  });
+
+  return Observable.create(observer => watcher.on('all', (event: string, filePath: string) => observer.next(filePath)));
+};

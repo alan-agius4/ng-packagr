@@ -1,6 +1,7 @@
 import * as path from 'path';
 import { NgEntryPoint } from './entry-point';
 import { DirectoryPath } from './shared';
+import { CacheEntry } from '../ts/watch-compiler-host';
 
 /**
  * A package being built. Quoting Angular Package Format, a package is:
@@ -64,6 +65,8 @@ export class NgPackage {
   public get keepLifecycleScripts(): boolean {
     return this.primary.$get('keepLifecycleScripts') === true;
   }
+  
+  public watchFileCache = new Map<string, CacheEntry>();
 
   public get whitelistedNonPeerDependencies(): string[] {
     // XX: default array values from JSON schema not recognized

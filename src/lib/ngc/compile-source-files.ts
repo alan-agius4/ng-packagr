@@ -7,28 +7,38 @@ import { TsConfig } from '../ts/tsconfig';
 import * as log from '../util/log';
 import { createEmitCallback } from './create-emit-callback';
 import { redirectWriteFileCompilerHost } from '../ts/redirect-write-file-compiler-host';
+import { watchCompilerHost } from '../ts/watch-compiler-host';
 
 export async function compileSourceFiles(
   sourceFiles: ts.SourceFile[],
   tsConfig: TsConfig,
   extraOptions?: Partial<ng.CompilerOptions>,
-  declarationDir?: string
+  declarationDir?: string,
+  compilerHost?: ng.CompilerHost,
+  fileCache?: any
 ) {
   log.debug(`ngc (v${ng.VERSION.full})`);
 
   const tsConfigOptions: ng.CompilerOptions = { ...tsConfig.options, ...extraOptions };
 
-  // ts.CompilerHost
-  let tsCompilerHost = createCompilerHostForSynthesizedSourceFiles(sourceFiles, tsConfigOptions);
-  if (declarationDir) {
-    tsCompilerHost = redirectWriteFileCompilerHost(tsCompilerHost, tsConfigOptions.baseUrl, declarationDir);
-  }
+  let ngCompilerHost;
 
-  // ng.CompilerHost
-  const ngCompilerHost = ng.createCompilerHost({
-    options: tsConfigOptions,
-    tsHost: tsCompilerHost
-  });
+  // if (fileCache && compilerHost) {
+  //   ngCompilerHost = watchCompilerHost(fileCache, compilerHost);
+  // } else {
+    // ts.CompilerHost
+    let tsCompilerHost = createCompilerHostForSynthesizedSourceFiles(sourceFiles, tsConfigOptions);
+    if (declarationDir) {
+      tsCompilerHost = redirectWriteFileCompilerHost(tsCompilerHost, tsConfigOptions.baseUrl, declarationDir);
+    }
+
+    // ng.CompilerHost
+    ngCompilerHost = ng.createCompilerHost({
+      options: tsConfigOptions,
+      tsHost: tsCompilerHost
+    });
+
+  // }
 
   // ngc
   const result = ng.performCompilation({
@@ -54,5 +64,7 @@ export async function compileSourceFiles(
   }
 
   const exitCode = ng.exitCodeFromResult(result.diagnostics);
-  return exitCode === 0 ? Promise.resolve() : Promise.reject(new Error(ng.formatDiagnostics(result.diagnostics)));
+  return exitCode === 0
+    ? Promise.resolve({ program: result.program as any, compilerHost: ngCompilerHost as any })
+    : Promise.reject(new Error(ng.formatDiagnostics(result.diagnostics)));
 }

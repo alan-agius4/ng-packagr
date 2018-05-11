@@ -11,12 +11,14 @@ import {
   isEntryPoint,
   EntryPointNode
 } from '../../nodes';
+import { NgPackage } from '../../../ng-package-format/package';
 
 export const compileNgcTransform: Transform = transformFromPromise(async graph => {
   log.info(`Compiling TypeScript sources through ngc`);
   const entryPoint = graph.find(isEntryPointInProgress()) as EntryPointNode;
   const tsSources = entryPoint.find(isTypeScriptSources) as TypeScriptSourceNode;
   const tsConfig: TsConfig = entryPoint.data.tsConfig;
+  const ngPackage: NgPackage = graph.find(node => node.type === 'application/ng-package').data;
 
   // Add paths mappings for dependencies
   const entryPointDeps = entryPoint.filter(isEntryPoint) as EntryPointNode[];
@@ -42,7 +44,7 @@ export const compileNgcTransform: Transform = transformFromPromise(async graph =
   const { esm2015, esm5, declarations } = entryPoint.data.destinationFiles;
   const previousTransform = tsSources.data;
 
-  await Promise.all([
+  const [es2015Result, es5Result] = await Promise.all([
     compileSourceFiles(
       tsSources.data.transformed,
       tsConfig,
@@ -51,7 +53,9 @@ export const compileNgcTransform: Transform = transformFromPromise(async graph =
         declaration: true,
         target: ts.ScriptTarget.ES2015
       },
-      path.dirname(declarations)
+      path.dirname(declarations),
+      (entryPoint.data.entryPoint as any).es2015ResultCompilerHost,
+      ngPackage.watchFileCache
     ),
 
     compileSourceFiles(tsSources.data.transformed, tsConfig, {
@@ -65,6 +69,10 @@ export const compileNgcTransform: Transform = transformFromPromise(async graph =
       fullTemplateTypeCheck: false
     })
   ]);
+
+  // todo refactor
+  (entryPoint.data.entryPoint as any).es5ResultCompilerHost = es5Result.compilerHost;
+  (entryPoint.data.entryPoint as any).es2015ResultCompilerHost = es2015Result.compilerHost;
 
   previousTransform.dispose();
 
