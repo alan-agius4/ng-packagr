@@ -6,9 +6,7 @@ import { Component } from '@angular/core';
   styleUrls: ['./foo.component.scss']
 })
 export class FooComponent {
-
   constructor() {
-    console.log("nooo/!");
+    console.log('nooo/!');
   }
-
 }

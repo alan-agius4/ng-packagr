@@ -89,28 +89,26 @@ export const packageTransformFactory = (
   );
 
   const watch$ = createWatcher(project);
-  const x = combineLatest(
-      build$,
-      watch$
-    ).pipe(
-      tap(([graph, fileWatched]) => {
-        console.log('file changed');
-        const ngPkg = graph.get(pkgUri);
-        if (ngPkg) {
-          const file = path.resolve(fileWatched.replace(/\\/g, '/'));
-          ngPkg.data.watchFileCache.delete(file);
-        }
-      }),
-      map(([graph, fileWatched]) => {
-        return graph;
-      }),
-      tap(graph => {
-        const entryPoints = graph.filter(isEntryPoint);
-        entryPoints.forEach(x => x.state = 'dirty')
-      }),
-      analyseSourcesTransform,
-      scheduleEntryPoints(entryPointTransform),
-    )
+  const x = combineLatest(build$, watch$).pipe(
+    tap(([graph, fileWatched]) => {
+      console.log('file changed');
+      const ngPkg = graph.get(pkgUri);
+      if (ngPkg) {
+        const file = path.resolve(fileWatched.replace(/\\/g, '/'));
+        ngPkg.data.watchFileCache.delete(file);
+      }
+    }),
+    map(([graph, fileWatched]) => {
+      return graph;
+    }),
+    map(graph => {
+      const entryPoints = graph.filter(isEntryPoint);
+      entryPoints.forEach(x => (x.state = 'dirty'));
+      return graph;
+    }),
+    analyseSourcesTransform,
+    scheduleEntryPoints(entryPointTransform)
+  );
 
   return x || build$;
 };
@@ -165,11 +163,10 @@ const scheduleEntryPoints = (epTransform: Transform): Transform =>
     })
   );
 
-
 const createWatcher = project => {
   const watcher = chokidar.watch(path.resolve(path.dirname(project)), {
     ignoreInitial: true,
-    ignored: /((^[\/\\])\..)|(\.js$)|(\.map$)|(dist$)|(\.metadata\.json)/,
+    ignored: /((^[\/\\])\..)|(\.js$)|(\.map$)|(dist)|(\.metadata\.json)/,
     persistent: true,
     interval: 100,
     awaitWriteFinish: true

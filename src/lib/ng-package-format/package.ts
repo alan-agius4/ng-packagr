@@ -65,7 +65,7 @@ export class NgPackage {
   public get keepLifecycleScripts(): boolean {
     return this.primary.$get('keepLifecycleScripts') === true;
   }
-  
+
   public watchFileCache = new Map<string, CacheEntry>();
 
   public get whitelistedNonPeerDependencies(): string[] {

@@ -10,16 +10,16 @@ function isTransformationResult<T extends ts.Node>(value: any): value is ts.Tran
 export function transformSourceFiles(
   source: TsConfig | ts.TransformationResult<ts.SourceFile>,
   transformers: ts.TransformerFactory<ts.SourceFile>[],
-  fileCache? : WatchFileCache
+  fileCache?: WatchFileCache
 ): ts.TransformationResult<ts.SourceFile> {
   if (isTransformationResult<ts.SourceFile>(source)) {
-      console.log('transform files');
+    console.log('transform files');
     // Apply subsequent typescript transformation to previous TransformationResult
     return ts.transform([...source.transformed], transformers);
   } else {
     // Apply initial typescript transformation to initial sources from TsConfig
     if (!fileCache) {
-      throw new Error('fileCache is required.')
+      throw new Error('fileCache is required.');
     }
 
     console.log('transform files');
@@ -30,7 +30,7 @@ export function transformSourceFiles(
       options: tsConfig.options
     });
 
-  // compilerHost = watchCompilerHost(fileCache, compilerHost);
+    // compilerHost = watchCompilerHost(fileCache, compilerHost);
 
     const program: ng.Program = ng.createProgram({
       rootNames: [...tsConfig.rootNames],

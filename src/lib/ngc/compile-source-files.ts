@@ -26,17 +26,17 @@ export async function compileSourceFiles(
   // if (fileCache && compilerHost) {
   //   ngCompilerHost = watchCompilerHost(fileCache, compilerHost);
   // } else {
-    // ts.CompilerHost
-    let tsCompilerHost = createCompilerHostForSynthesizedSourceFiles(sourceFiles, tsConfigOptions);
-    if (declarationDir) {
-      tsCompilerHost = redirectWriteFileCompilerHost(tsCompilerHost, tsConfigOptions.baseUrl, declarationDir);
-    }
+  // ts.CompilerHost
+  let tsCompilerHost = createCompilerHostForSynthesizedSourceFiles(sourceFiles, tsConfigOptions);
+  if (declarationDir) {
+    tsCompilerHost = redirectWriteFileCompilerHost(tsCompilerHost, tsConfigOptions.baseUrl, declarationDir);
+  }
 
-    // ng.CompilerHost
-    ngCompilerHost = ng.createCompilerHost({
-      options: tsConfigOptions,
-      tsHost: tsCompilerHost
-    });
+  // ng.CompilerHost
+  ngCompilerHost = ng.createCompilerHost({
+    options: tsConfigOptions,
+    tsHost: tsCompilerHost
+  });
 
   // }
 
