@@ -4,17 +4,14 @@ import { Transform, transformFromPromise } from '../../../brocc/transform';
 import { compileSourceFiles } from '../../../ngc/compile-source-files';
 import { TsConfig } from '../../../ts/tsconfig';
 import * as log from '../../../util/log';
-import {
-  isEntryPointInProgress,
-  isTypeScriptSources,
-  TypeScriptSourceNode,
-  isEntryPoint,
-  EntryPointNode
-} from '../../nodes';
+import { isEntryPointInProgress, isEntryPoint, EntryPointNode, PackageNode, isPackage } from '../../nodes';
 
 export const compileNgcTransform: Transform = transformFromPromise(async graph => {
   log.info(`Compiling TypeScript sources through ngc`);
   const entryPoint = graph.find(isEntryPointInProgress()) as EntryPointNode;
+  const ngPkg = graph.find(isPackage) as PackageNode;
+  const { moduleResolutionCache } = ngPkg;
+
   const tsConfig: TsConfig = entryPoint.data.tsConfig;
 
   // Add paths mappings for dependencies
@@ -43,7 +40,8 @@ export const compileNgcTransform: Transform = transformFromPromise(async graph =
   await Promise.all([
     compileSourceFiles(
       tsConfig,
-      entryPoint.dependents,
+      entryPoint.fileCache,
+      moduleResolutionCache,
       {
         outDir: path.dirname(esm2015),
         declaration: true,
@@ -52,7 +50,7 @@ export const compileNgcTransform: Transform = transformFromPromise(async graph =
       path.dirname(declarations)
     ),
 
-    compileSourceFiles(tsConfig, entryPoint.dependents, {
+    compileSourceFiles(tsConfig, entryPoint.fileCache, moduleResolutionCache, {
       outDir: path.dirname(esm5),
       target: ts.ScriptTarget.ES5,
       downlevelIteration: true,

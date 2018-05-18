@@ -6,12 +6,13 @@ import { TsConfig } from '../ts/tsconfig';
 import * as log from '../util/log';
 import { createEmitCallback } from './create-emit-callback';
 import { redirectWriteFileCompilerHost } from '../ts/redirect-write-file-compiler-host';
-import { fileUrl } from '../ng-v5/nodes';
-import { Node } from '../brocc/node';
+import { cacheCompilerHost } from '../ts/cache-compiler-host';
+import { FileCache } from '../file/file-cache';
 
 export async function compileSourceFiles(
   tsConfig: TsConfig,
-  resources: Node[] | undefined,
+  fileCache: FileCache,
+  moduleResolutionCache: ts.ModuleResolutionCache,
   extraOptions?: Partial<ng.CompilerOptions>,
   declarationDir?: string
 ) {
@@ -19,7 +20,7 @@ export async function compileSourceFiles(
 
   const tsConfigOptions: ng.CompilerOptions = { ...tsConfig.options, ...extraOptions };
 
-  let tsCompilerHost = ts.createCompilerHost(tsConfigOptions);
+  let tsCompilerHost = cacheCompilerHost(tsConfigOptions, fileCache, moduleResolutionCache);
   if (declarationDir) {
     tsCompilerHost = redirectWriteFileCompilerHost(tsCompilerHost, tsConfigOptions.basePath, declarationDir);
   }
@@ -30,15 +31,9 @@ export async function compileSourceFiles(
     tsHost: tsCompilerHost
   });
 
-  // This is used in combination with 'enableResourceInlining'
   ngCompilerHost.readResource = (fileName: string) => {
-    const url = fileUrl(fileName);
-    const result = resources.find(x => x.url === url);
-    if (!result) {
-      throw new Error(`Cannot read resource: ${fileName}`);
-    }
-
-    return result.data.content;
+    const cachedEntry = fileCache.get(fileName);
+    return cachedEntry.processedContent || cachedEntry.content;
   };
 
   const program = ng.createProgram({

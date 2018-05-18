@@ -1,9 +1,10 @@
-import * as fs from 'fs-extra';
 import * as path from 'path';
 import { Transform, transformFromPromise } from '../../../brocc/transform';
 import { NgEntryPoint } from '../../../ng-package-format/entry-point';
 import * as log from '../../../util/log';
-import { isEntryPointInProgress, fileUrlPath, isPackage, TYPE_STYLESHEET } from '../../nodes';
+import { CssUrl } from '../../../ng-package-format/shared';
+import { CacheEntry } from '../../../file/file-cache';
+import { isEntryPointInProgress, isPackage, EntryPointNode } from '../../nodes';
 
 // CSS Tools
 import * as autoprefixer from 'autoprefixer';
@@ -15,30 +16,34 @@ import * as postcssUrl from 'postcss-url';
 import * as postcssClean from 'postcss-clean';
 import * as less from 'less';
 import * as stylus from 'stylus';
-import { CssUrl } from '../../../ng-package-format/shared';
+
+const STYLESHEET_REGEXP = /.*.(sass|scss|less|css|stylus|styl)$/;
 
 export const stylesheetTransform: Transform = transformFromPromise(async graph => {
   log.info(`Rendering Stylesheets`);
 
   // Fetch current entry point from graph
-  const entryPoint = graph.find(isEntryPointInProgress());
+  const entryPoint = graph.find(isEntryPointInProgress()) as EntryPointNode;
 
   // Fetch stylesheet nodes from the graph
-  const stylesheetNodes = graph.from(entryPoint).filter(node => node.type === TYPE_STYLESHEET && node.state !== 'done');
+  const stylesheetPaths: string[] = [];
+
+  entryPoint.fileCache.forEach((value, fileName) => {
+    if (!value.processedContent && STYLESHEET_REGEXP.test(fileName)) {
+      stylesheetPaths.push(fileName);
+    }
+  });
 
   // Determine base path from NgPackage
   const ngPkg = graph.find(isPackage);
-
   const postCssProcessor = createPostCssProcessor(ngPkg.data.basePath, entryPoint.data.entryPoint.cssUrl);
 
-  for (let stylesheetNode of stylesheetNodes) {
-    const { data, url } = stylesheetNode;
-    const filePath: string = fileUrlPath(url);
-
+  for (let filePath of stylesheetPaths) {
+    const cachedData = entryPoint.fileCache.get(filePath);
     // Render pre-processor language (sass, styl, less)
     const renderedCss: string = await renderPreProcessor(
       filePath,
-      data.source,
+      cachedData.content,
       ngPkg.data.basePath,
       entryPoint.data.entryPoint
     );
@@ -55,10 +60,7 @@ export const stylesheetTransform: Transform = transformFromPromise(async graph =
     });
 
     // Update node in the graph
-    stylesheetNode.data = {
-      ...data,
-      content: result.css
-    };
+    cachedData.processedContent = result.css;
   }
 
   return graph;
