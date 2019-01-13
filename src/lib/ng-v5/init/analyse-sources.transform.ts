@@ -1,4 +1,3 @@
-import * as ng from '@angular/compiler-cli';
 import * as ts from 'typescript';
 import { pipe } from 'rxjs';
 import { map } from 'rxjs/operators';
@@ -7,7 +6,6 @@ import { Transform } from '../../brocc/transform';
 import { isEntryPoint, EntryPointNode } from '../nodes';
 import { cacheCompilerHost } from '../../ts/cache-compiler-host';
 import { unique } from '../../util/array';
-import { setDependenciesTsConfigPaths } from '../../ts/tsconfig';
 import { BuildGraph } from '../../brocc/build-graph';
 
 export const analyseSourcesTransform: Transform = pipe(
@@ -35,42 +33,39 @@ function analyseEntryPoint(graph: BuildGraph, entryPoint: EntryPointNode, entryP
   log.debug(`Analysing sources for ${moduleId}`);
 
   // Add paths mappings for dependencies
-  const tsConfig = setDependenciesTsConfigPaths(entryPoint.data.tsConfig, entryPoints, true);
-
-  const compilerHost = {
-    ...cacheCompilerHost(graph, entryPoint, tsConfig.options, analysisModuleResolutionCache),
-    readResource: () => ''
-  };
+  // const tsConfig = setDependenciesTsConfigPaths(entryPoint.data.tsConfig, entryPoints, true);
 
   // a new program is created here, as re-uing a program is only possible when emitting
   // which is not done for entry-point analysis.
   // we should probably use a TS program instead.
-  const program: ng.Program = ng.createProgram({
-    rootNames: tsConfig.rootNames,
-    options: {
-      ...tsConfig.options,
-      // we don't need angular metadata to analyse entrypoints
-      skipMetadataEmit: true,
-      skipTemplateCodegen: true,
-      strictMetadataEmit: false,
-      skipLibCheck: true,
-      noResolve: true,
-      noLib: true,
-      types: []
-    },
-    host: compilerHost
-  });
 
-  const diagnostics = program.getTsSyntacticDiagnostics();
-  if (diagnostics.length) {
-    throw new Error(ng.formatDiagnostics(diagnostics));
-  }
+  const tsOptions: ts.CompilerOptions = {
+    ...entryPoint.data.tsConfig.options,
+    // we don't need angular metadata to analyse entrypoints
+    moduleResolution: ts.ModuleResolutionKind.NodeJs,
+    skipLibCheck: true,
+    types: []
+  };
+
+  const program: ts.Program = ts.createProgram({
+    rootNames: entryPoint.data.tsConfig.rootNames,
+    host: {
+      ...cacheCompilerHost(graph, entryPoint, tsOptions, analysisModuleResolutionCache),
+      getSourceFile: (fileName: string, languageVersion: ts.ScriptTarget) => {
+        const cache = sourcesFileCache.getOrCreate(fileName);
+        if (cache.sourceFile === undefined) {
+          cache.sourceFile = compilerHost.getSourceFile.call(this, fileName, languageVersion);
+        }
+        return cache.sourceFile;
+      }
+    },
+    options: tsOptions
+  });
 
   // this is a workaround due to the below
   // https://github.com/angular/angular/issues/24010
   let moduleStatements: string[] = [];
   program
-    .getTsProgram()
     .getSourceFiles()
     .filter(x => !/node_modules|\.ngfactory|\.ngstyle|(\.d\.ts$)/.test(x.fileName))
     .forEach(sourceFile => {
@@ -82,7 +77,7 @@ function analyseEntryPoint(graph: BuildGraph, entryPoint: EntryPointNode, entryP
             return;
           }
 
-          const text = moduleSpecifier.getText();
+          const text = (moduleSpecifier as ts.Identifier).text || moduleSpecifier.getText();
           const trimmedText = text.substring(1, text.length - 1);
           if (!trimmedText.startsWith('.')) {
             moduleStatements.push(trimmedText);

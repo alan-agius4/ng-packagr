@@ -55,7 +55,6 @@ export async function compileSourceFiles(
 
   const diagnostics = [
     ...ngProgram.getNgOptionDiagnostics(),
-    ...ngProgram.getTsSyntacticDiagnostics(),
     ...ngProgram.getTsSemanticDiagnostics(),
     ...ngProgram.getNgSemanticDiagnostics(),
     ...ngProgram.getNgStructuralDiagnostics()

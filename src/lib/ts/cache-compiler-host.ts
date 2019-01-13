@@ -50,7 +50,7 @@ export function cacheCompilerHost(
       addDependee(fileName);
 
       const cache = sourcesFileCache.getOrCreate(fileName);
-      if (!cache.sourceFile) {
+      if (cache.sourceFile === undefined) {
         cache.sourceFile = compilerHost.getSourceFile.call(this, fileName, languageVersion);
       }
       return cache.sourceFile;
@@ -64,7 +64,9 @@ export function cacheCompilerHost(
       sourceFiles?: ReadonlyArray<ts.SourceFile>
     ) => {
       if (fileName.endsWith('.d.ts')) {
+        sourcesFileCache.delete(fileName);
         sourceFiles.forEach(source => {
+          sourcesFileCache.delete(source.fileName);
           const cache = sourcesFileCache.getOrCreate(source.fileName);
           if (!cache.declarationFileName) {
             cache.declarationFileName = ensureUnixPath(fileName);
