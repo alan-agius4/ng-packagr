@@ -1,5 +1,4 @@
 import { ParsedConfiguration } from '@angular/compiler-cli/src/perform_compile';
-import { expect } from 'chai';
 import { ngPackagr, NgPackagr } from './packagr';
 import { provideProject, PROJECT_TOKEN } from './project.di';
 import { DEFAULT_TS_CONFIG_TOKEN } from './init/init-tsconfig.di';
@@ -9,32 +8,29 @@ describe(`ngPackagr()`, () => {
   beforeEach(() => {
     packager = ngPackagr();
   });
-  it(`should return a NgPackagr instance`, () => {
-    expect(packager).to.be.an.instanceOf(NgPackagr);
-  });
 
   it(`should have a default tsconfig`, () => {
     const defaultTsConfigProvider = packager['providers'].filter(p => (p as any).provide === DEFAULT_TS_CONFIG_TOKEN);
-    expect(defaultTsConfigProvider).to.have.length(1);
+    expect(defaultTsConfigProvider.length).toBe(1);
   });
 
   describe(`forProject()`, () => {
     it(`should return self instance for chaining`, () => {
-      expect(packager.forProject('foo')).to.equal(packager);
+      expect(packager.forProject('foo')).toEqual(packager);
     });
 
     it(`should set project provider`, () => {
       const providers = packager.forProject('foobar')['providers'].filter(p => (p as any).provide === PROJECT_TOKEN);
 
-      expect(providers).to.have.length(1);
-      expect((providers[0] as any).useValue).to.equal('foobar');
+      expect(providers.length).toBe(1);
+      expect((providers[0] as any).useValue).toEqual('foobar');
     });
   });
 
   describe(`withTsConfig()`, () => {
     it(`should return self instance for chaining`, () => {
       const mockConfig = ({ project: 'foo' } as any) as ParsedConfiguration;
-      expect(packager.withTsConfig(mockConfig)).to.equal(packager);
+      expect(packager.withTsConfig(mockConfig)).toEqual(packager);
     });
 
     it(`should override the default tsconfig provider`, () => {
@@ -43,9 +39,9 @@ describe(`ngPackagr()`, () => {
         .withTsConfig(mockConfig)
         ['providers'].filter(p => (p as any).provide === DEFAULT_TS_CONFIG_TOKEN);
 
-      expect(providers).to.have.length(2);
-      expect((providers[1] as any).useFactory).to.be.a('function');
-      expect((providers[1] as any).useFactory()).to.satisfy(val => val.project === 'foo');
+      expect(providers.length).toBe(2);
+      expect(typeof (providers[1] as any).useFactory).toBe('function');
+      expect((providers[1] as any).useFactory().project).toBe('foo');
     });
   });
 });
@@ -53,7 +49,7 @@ describe(`ngPackagr()`, () => {
 describe(`provideProject()`, () => {
   it(`should return the ValueProvider`, () => {
     const provider = provideProject('foo');
-    expect(provider.provide).to.equal(PROJECT_TOKEN);
-    expect(provider.useValue).to.equal('foo');
+    expect(provider.provide).toEqual(PROJECT_TOKEN);
+    expect(provider.useValue).toEqual('foo');
   });
 });

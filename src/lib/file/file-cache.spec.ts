@@ -1,4 +1,3 @@
-import { expect } from 'chai';
 import { FileCache } from './file-cache';
 
 describe('FileCache', () => {
@@ -13,11 +12,11 @@ describe('FileCache', () => {
   });
 
   it('should return an empty object when file is not found', () => {
-    expect(cache.getOrCreate('not-available')).to.ok;
+    expect(cache.getOrCreate('not-available')).toBeDefined();
   });
 
   it(`should delete only a single file`, () => {
     cache.delete('/component/component-primary.scss');
-    expect(cache.size()).to.equal(3);
+    expect(cache.size()).toBe(3);
   });
 });

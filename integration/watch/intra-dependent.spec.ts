@@ -1,11 +1,10 @@
-import { expect } from 'chai';
 import * as fs from 'fs';
 import { TestHarness } from './test-harness';
 
 describe('intra-dependent', () => {
   const harness = new TestHarness('intra-dependent');
 
-  before(async () => {
+  beforeAll(async () => {
     await harness.initialize();
   });
 
@@ -13,7 +12,7 @@ describe('intra-dependent', () => {
     harness.reset();
   });
 
-  after(() => {
+  afterAll(() => {
     harness.dispose();
   });
 
@@ -27,7 +26,7 @@ describe('intra-dependent', () => {
     harness.copyTestCase('invalid-component-property');
 
     harness.onFailure(error => {
-      expect(error.message).to.match(/Can\'t bind to \'count\' since it isn\'t a known property/);
+      expect(error.message).toMatch(/Can\'t bind to \'count\' since it isn\'t a known property/);
       harness.copyTestCase('valid');
       done();
     });
@@ -37,7 +36,7 @@ describe('intra-dependent', () => {
     harness.copyTestCase('invalid-service-method');
 
     harness.onFailure(error => {
-      expect(error.message).to.match(/Property \'initialize\' does not exist on type \'PrimaryAngularService\'/);
+      expect(error.message).toMatch(/Property \'initialize\' does not exist on type \'PrimaryAngularService\'/);
       harness.copyTestCase('valid');
       done();
     });
@@ -54,9 +53,9 @@ describe('intra-dependent', () => {
     harness.copyTestCase('valid');
 
     harness.onComplete(() => {
-      expect(fs.statSync(primaryFesmPath).mtimeMs).to.greaterThan(primaryModifiedTime);
-      expect(fs.statSync(secondaryFesmPath).mtimeMs).to.greaterThan(secondaryModifiedTime);
-      expect(fs.statSync(thirdFesmPath).mtimeMs).to.equals(thirdModifiedTime);
+      expect(fs.statSync(primaryFesmPath).mtimeMs).toBeGreaterThan(primaryModifiedTime);
+      expect(fs.statSync(secondaryFesmPath).mtimeMs).toBeGreaterThan(secondaryModifiedTime);
+      expect(fs.statSync(thirdFesmPath).mtimeMs).toEqual(thirdModifiedTime);
       done();
     });
   });

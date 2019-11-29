@@ -72,9 +72,8 @@ jobs:
             fi
             # Build, pack and publish to npm registry
             echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" >> ~/.npmrc
-            yarn publish:ci
-            pushd dist
-            npm publish --tag ${NPM_TAG}
+            # yarn publish:ci
+            yarn bazel run //src:ngpackagr.publish -- --tag ${NPM_TAG}
 
 workflows:
   version: 2

@@ -1,10 +1,8 @@
 import * as fs from 'fs-extra';
-import * as sinon from 'sinon';
 import * as path from 'path';
 import * as log from '../../src/lib/util/log';
-import { expect } from 'chai';
 import { Subscription } from 'rxjs';
-import { ngPackagr } from '../../src/public_api';
+import { ngPackagr } from 'ng-packagr';
 import { tap } from 'rxjs/operators';
 
 /**
@@ -12,13 +10,12 @@ import { tap } from 'rxjs/operators';
  */
 export class TestHarness {
   private completeHandler = () => undefined;
-
-  private harnessTempDir = path.join(__dirname, '.tmp');
+  private harnessTempDir = path.join(process.env.TEST_TMPDIR, '.tmp');
   private testTempPath = path.join(this.harnessTempDir, this.testName);
-  private testSrc = path.join(__dirname, this.testName);
+  private testSrc = path.dirname(require.resolve(`ngpackagr/integration/watch/${this.testName}`));
   private testDistPath = path.join(this.testTempPath, 'dist');
   private ngPackagr$$: Subscription;
-  private loggerStubs: { [key: string]: sinon.SinonStub } = {};
+  private loggerStubs: Record<string, jasmine.Spy> = {};
 
   constructor(private testName: string) {}
 
@@ -26,7 +23,7 @@ export class TestHarness {
     // the below is done in order to avoid poluting the test reporter with build logs
     for (const key in log) {
       if (log.hasOwnProperty(key)) {
-        this.loggerStubs[key] = sinon.stub(log, key as keyof typeof log);
+        //    this.loggerStubs[key] = spyOn(log, key as keyof typeof log).and.stub();
       }
     }
 
@@ -40,7 +37,7 @@ export class TestHarness {
     this.reset();
 
     for (const key in this.loggerStubs) {
-      this.loggerStubs[key].restore();
+      this.loggerStubs[key].and.callThrough();
     }
 
     if (this.ngPackagr$$) {
@@ -51,7 +48,7 @@ export class TestHarness {
   }
 
   reset(): void {
-    this.loggerStubs['error'].resetBehavior();
+    this.loggerStubs['error'].and.callThrough();
     this.completeHandler = () => undefined;
   }
 
@@ -67,21 +64,21 @@ export class TestHarness {
     fs.copySync(path.join(this.testSrc, 'test_files', caseName), this.testTempPath);
   }
 
-  expectFesm5ToMatch(fileName: string, regexp: RegExp): Chai.Assertion {
-    return expect(this.readFileSync(`fesm5/${fileName}.js`)).to.match(regexp);
+  expectFesm5ToMatch(fileName: string, regexp: RegExp): boolean {
+    return expect(this.readFileSync(`fesm5/${fileName}.js`)).toMatch(regexp);
   }
 
-  expectFesm2015ToMatch(fileName: string, regexp: RegExp): Chai.Assertion {
-    return expect(this.readFileSync(`fesm2015/${fileName}.js`)).to.match(regexp);
+  expectFesm2015ToMatch(fileName: string, regexp: RegExp): boolean {
+    return expect(this.readFileSync(`fesm2015/${fileName}.js`)).toMatch(regexp);
   }
 
-  expectDtsToMatch(fileName: string, regexp: RegExp): Chai.Assertion {
-    return expect(this.readFileSync(`${fileName}.d.ts`)).to.match(regexp);
+  expectDtsToMatch(fileName: string, regexp: RegExp): boolean {
+    return expect(this.readFileSync(`${fileName}.d.ts`)).toMatch(regexp);
   }
 
-  expectMetadataToContain(fileName: string, path: string, value: any): Chai.Assertion {
+  expectMetadataToContain(fileName: string, path: string, value: any): boolean {
     const data = this.readFileSync(`${fileName}.metadata.json`, true);
-    return expect(data).to.have.nested.property(path, value);
+    return expect(data).toContain(path, value);
   }
 
   /**
@@ -95,7 +92,7 @@ export class TestHarness {
    * Gets invoked when a compilation error occuries.
    */
   onFailure(done: (error: Error) => void): void {
-    this.loggerStubs['error'].callsFake(done);
+    this.loggerStubs['error'].and.callFake(done);
   }
 
   /**

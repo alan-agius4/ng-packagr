@@ -1,0 +1,91 @@
+load("@build_bazel_rules_nodejs//:index.bzl", "npm_package")
+load("@npm_bazel_typescript//:index.bzl", "ts_library")
+load("@npm_bazel_jasmine//:index.bzl", "jasmine_node_test")
+
+package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "assets",
+    srcs = [
+        ":ng-package.schema.json",
+        ":lib/ts/conf/tsconfig.ngc.json",
+        "//:package.json",
+        "//:LICENSE",
+        "//:CHANGELOG.md",
+        "//:README.md",
+    ],
+)
+
+ts_library(
+    name = "ngpackagr",
+    srcs = glob(
+        ["**/*.ts"],
+        exclude = [
+            "**/*.spec.ts",
+        ],
+    ),
+    module_name = "ng-packagr",
+    data = [
+        ":assets",
+    ],
+    deps = [
+        "@npm//@types/node",
+        "@npm//@types/chokidar",
+        "@npm//injection-js",
+        "@npm//@angular/compiler",
+        "@npm//@angular/compiler-cli",
+        "@npm//rxjs",
+        "@npm//typescript",
+        "@npm//chalk",
+        "@npm//@types/update-notifier",
+        "@npm//commander",
+        "@npm//@types/read-pkg-up",
+        "@npm//@types/browserslist",
+        "@npm//@types/autoprefixer",
+        "@npm//tsickle",
+        "@npm//@types/clean-css",
+        "@npm//@types/fs-extra",
+        "@npm//@types/glob",
+        "@npm//ajv",
+        "@npm//postcss",
+        "@npm//node-sass-tilde-importer",
+        "@npm//postcss-url",
+        "@npm//rollup",
+        "@npm//terser",
+        "@npm//@types/stylus",
+        "@npm//@types/uglify-js",
+    ],
+)
+
+npm_package(
+    name = "npm_package",
+    deps = [
+        ":ngpackagr",
+    ],
+)
+
+### Testing rules
+ts_library(
+    name = "ngpackagr_test_lib",
+    testonly = True,
+    srcs = glob(
+        include = [
+            "**/*.spec.ts",
+        ],
+    ),
+    deps = [
+        ":ngpackagr",
+        "@npm//@angular/compiler-cli",
+        "@npm//@types/jasmine",
+        "@npm//@types/node",
+    ],
+)
+
+jasmine_node_test(
+    name = "unit_tests",
+    srcs = [":ngpackagr_test_lib"],
+    deps = [
+        "@npm//:node_modules",
+        "@npm//jasmine",
+    ],
+)

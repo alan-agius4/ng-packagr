@@ -1,4 +1,3 @@
-import { expect } from 'chai';
 import { DepthBuilder } from './depth';
 
 describe(`DepthBuilder`, () => {
@@ -8,9 +7,9 @@ describe(`DepthBuilder`, () => {
     builder.add('a', ['c']);
 
     const groups = builder.build();
-    expect(groups[0][0]).to.equal('b');
-    expect(groups[0][1]).to.equal('c');
-    expect(groups[1][0]).to.equal('a');
+    expect(groups[0][0]).toBe('b');
+    expect(groups[0][1]).toBe('c');
+    expect(groups[1][0]).toBe('a');
   });
 
   it(`should group a->b, a->c, b->c`, () => {
@@ -19,9 +18,9 @@ describe(`DepthBuilder`, () => {
     builder.add('b', ['c']);
 
     const groups = builder.build();
-    expect(groups[0][0]).to.equal('c');
-    expect(groups[1][0]).to.equal('b');
-    expect(groups[2][0]).to.equal('a');
+    expect(groups[0][0]).toBe('c');
+    expect(groups[1][0]).toBe('b');
+    expect(groups[2][0]).toBe('a');
   });
 
   /*
@@ -41,12 +40,12 @@ describe(`DepthBuilder`, () => {
     builder.add('h', 'j');
 
     const groups = builder.build();
-    expect(groups.length).to.equal(6);
-    expect(groups[0]).to.have.same.members(['d', 'g', 'i', 'j']);
-    expect(groups[1]).to.have.same.members(['e', 'f', 'h']);
-    expect(groups[2]).to.have.same.members(['c']);
-    expect(groups[3]).to.have.same.members(['b']);
-    expect(groups[4]).to.have.same.members(['a']);
+    expect(groups.length).toEqual(6);
+    expect(groups[0]).toEqual(['d', 'g', 'i', 'j']);
+    expect(groups[1]).toEqual(['h', 'f', 'e']);
+    expect(groups[2]).toEqual(['c']);
+    expect(groups[3]).toEqual(['b']);
+    expect(groups[4]).toEqual(['a']);
   });
 
   /**
@@ -62,11 +61,11 @@ describe(`DepthBuilder`, () => {
     builder.add('e');
 
     const groups = builder.build();
-    expect(groups[0]).to.have.same.members(['e']);
-    expect(groups[1]).to.have.same.members(['d']);
-    expect(groups[2]).to.have.same.members(['c']);
-    expect(groups[3]).to.have.same.members(['b']);
-    expect(groups[4]).to.have.same.members(['a']);
+    expect(groups[0]).toEqual(['e']);
+    expect(groups[1]).toEqual(['d']);
+    expect(groups[2]).toEqual(['c']);
+    expect(groups[3]).toEqual(['b']);
+    expect(groups[4]).toEqual(['a']);
   });
 
   it(`should create a max depth that holds all buckets`, () => {
@@ -79,9 +78,9 @@ describe(`DepthBuilder`, () => {
     builder.add('sub');
 
     const groups = builder.build();
-    expect(groups[0]).to.have.same.members(['parent', 'shared', 'sub']);
-    expect(groups[1]).to.have.same.members(['a']);
-    expect(groups[2]).to.have.same.members(['b']);
-    expect(groups[3]).to.have.same.members(['c']);
+    expect(groups[0]).toEqual(['parent', 'shared', 'sub']);
+    expect(groups[1]).toEqual(['a']);
+    expect(groups[2]).toEqual(['b']);
+    expect(groups[3]).toEqual(['c']);
   });
 });

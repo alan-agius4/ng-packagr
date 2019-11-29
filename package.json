@@ -24,8 +24,8 @@
   "bin": {
     "ng-packagr": "./cli/main.js"
   },
-  "main": "./public_api.js",
-  "typings": "./public_api.d.ts",
+  "main": "./index.js",
+  "typings": "./index.d.ts",
   "dependencies": {
     "ajv": "^6.10.2",
     "autoprefixer": "^9.6.5",
@@ -69,20 +69,28 @@
     "@angular/material": "^8.0.0",
     "@angular/platform-browser": "~9.0.0-next.11",
     "@angular/router": "~9.0.0-next.11",
+    "@bazel/bazel": "1.2.0",
+    "@bazel/buildifier": "^0.29.0",
+    "@bazel/hide-bazel-files": "^0.42.0",
+    "@bazel/jasmine": "^0.42.0",
+    "@bazel/typescript": "^0.42.0",
     "@commitlint/cli": "^8.0.0",
     "@commitlint/config-angular": "^8.0.0",
     "@types/acorn": "^4.0.3",
+    "@types/autoprefixer": "^9.6.1",
+    "@types/browserslist": "^4.4.0",
     "@types/chai": "^4.0.0",
     "@types/chokidar": "^1.7.5",
     "@types/clean-css": "^4.0.0",
     "@types/fs-extra": "^8.0.0",
     "@types/glob": "^7.0.0",
-    "@types/jasmine": "^3.0.0",
+    "@types/jasmine": "^3.5.0",
     "@types/mocha": "^5.0.0",
     "@types/node": "^12.0.0",
     "@types/react": "^16.0.19",
     "@types/react-dom": "^16.0.2",
     "@types/read-pkg-up": "^3.0.1",
+    "@types/rollup-plugin-json": "^3.0.2",
     "@types/sinon": "^7.0.0",
     "@types/stylus": "^0.48.30",
     "@types/uglify-js": "^3.0.2",
@@ -111,7 +119,7 @@
   },
   "private": true,
   "scripts": {
-    "prebuild": "rimraf dist && yarn schema",
+    "prebuild": "yarn schema",
     "build": "tsc -p src/tsconfig.packagr.json",
     "postbuild": "node ./scripts/postbuild.js",
     "schema": "json2ts --input src/ng-package.schema.json --output src/ng-package.schema.ts",
@@ -127,7 +135,10 @@
     "integration:watch:specs": "cross-env TS_NODE_PROJECT=integration/tsconfig.specs.json mocha --timeout 25000 --require ts-node/register \"integration/watch/*.spec.ts\"",
     "test:specs": "cross-env TS_NODE_PROJECT=src/tsconfig.specs.json mocha --require ts-node/register \"src/**/*.spec.ts\"",
     "test": "yarn build && yarn test:specs && yarn integration:samples && yarn integration:specs && yarn integration:watch:specs && yarn integration:consumers",
-    "gh-pages": "gh-pages -d docs/ghpages"
+    "gh-pages": "gh-pages -d docs/ghpages",
+    "bazel:format": "find . -type f \\( -name \"*.bzl\" -or -name BUILD -or -name BUILD.bazel -or -name WORKSPACE \\) ! -path \"*/node_modules/*\" | xargs buildifier -v",
+    "bazel:lint": "yarn bazel:format --lint=warn",
+    "bazel:lint-fix": "yarn bazel:format --lint=fix"
   },
   "husky": {
     "hooks": {

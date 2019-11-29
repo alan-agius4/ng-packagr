@@ -1,10 +1,9 @@
-import { expect } from 'chai';
 import { TestHarness } from './test-harness';
 
 describe('basic', () => {
   const harness = new TestHarness('basic');
 
-  before(async () => {
+  beforeAll(async () => {
     await harness.initialize();
   });
 
@@ -12,7 +11,7 @@ describe('basic', () => {
     harness.reset();
   });
 
-  after(() => {
+  afterAll(() => {
     harness.dispose();
   });
 
@@ -50,7 +49,7 @@ describe('basic', () => {
 
         harness.onFailure(error => {
           harness.copyTestCase('valid-text');
-          expect(error.message).to.match(/is not assignable to type 'boolean'/);
+          expect(error.message).toMatch(/is not assignable to type 'boolean'/);
         });
       });
 

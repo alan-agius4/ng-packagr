@@ -7,7 +7,10 @@ import { NgEntryPoint } from '../ng-package-format/entry-point';
 import { NgPackage } from '../ng-package-format/package';
 import { globFiles } from '../util/glob';
 
-const ngPackageSchemaJson = require('../../ng-package.schema.json');
+const ngPackageSchemaJsonPath = process.env.BAZEL_TARGET
+  ? 'ngpackagr/src/ng-package.schema.json'
+  : '../../ng-package.schema.json';
+const ngPackageSchemaJson = require(ngPackageSchemaJsonPath);
 
 interface UserPackage {
   packageJson: object;

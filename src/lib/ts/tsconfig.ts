@@ -9,7 +9,11 @@ import * as log from '../util/log';
  */
 export function readDefaultTsConfig(fileName?: string): ng.ParsedConfiguration {
   if (!fileName) {
-    fileName = path.resolve(__dirname, 'conf', 'tsconfig.ngc.json');
+    if (process.env.BAZEL_TARGET) {
+      fileName = require.resolve('ngpackagr/src/lib/ts/conf/tsconfig.ngc.json');
+    } else {
+      fileName = path.resolve(__dirname, 'conf', 'tsconfig.ngc.json');
+    }
   }
 
   // these options are mandatory

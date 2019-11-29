@@ -111,7 +111,7 @@ export class StylesheetProcessor {
 
     // this is important to be executed post running `postcssUrl`
     postCssPlugins.push(
-      autoprefixer({ overrideBrowserslist, grid: true }),
+      autoprefixer({ overrideBrowserslist, grid: true as any }),
       postcssClean({
         level: {
           2: {

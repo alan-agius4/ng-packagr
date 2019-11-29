@@ -1,13 +1,14 @@
 import * as rollup from 'rollup';
-import * as nodeResolve from 'rollup-plugin-node-resolve';
-import * as sourcemaps from 'rollup-plugin-sourcemaps';
-import * as commonJs from 'rollup-plugin-commonjs';
-import * as rollupJson from 'rollup-plugin-json';
 import * as log from '../util/log';
 import { ExternalModuleIdStrategy, DependencyList } from './external-module-id-strategy';
 import { umdModuleIdStrategy } from './umd-module-id-strategy';
 import { TransformHook } from 'rollup';
 import { ensureUnixPath } from '../util/path';
+
+const nodeResolve = require('rollup-plugin-node-resolve');
+const sourcemaps = require('rollup-plugin-sourcemaps');
+const commonJs = require('rollup-plugin-commonjs');
+const rollupJson = require('rollup-plugin-json');
 
 /**
  * Options used in `ng-packagr` for writing flat bundle files.

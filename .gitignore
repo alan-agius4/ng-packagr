@@ -71,3 +71,6 @@ dist/
 
 # Tests
 .tmp
+
+# Bazel
+bazel-out

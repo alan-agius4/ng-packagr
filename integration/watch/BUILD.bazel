@@ -1,0 +1,40 @@
+load("@npm_bazel_typescript//:index.bzl", "ts_library")
+load("@npm_bazel_jasmine//:index.bzl", "jasmine_node_test")
+
+
+### Testing rules
+ts_library(
+    name = "watch",
+    testonly = True,
+    srcs = glob(
+        include = [
+            "*.ts",
+            "*.spec.ts",
+        ],
+    ),
+    data = [
+        "@npm//fs-extra",
+    ],
+    deps = [
+        "//src:ngpackagr",
+        "@npm//rxjs",
+        "@npm//@types/fs-extra",
+        "@npm//@angular/compiler-cli",
+        "@npm//@types/jasmine",
+        "@npm//@types/node",
+    ],
+)
+
+jasmine_node_test(
+    name = "unit_tests",
+    srcs = [":watch"],
+    data = [
+        ":resources",
+        ":intra-dependent",
+        ":basic",
+    ],
+    deps = [
+        "@npm//:node_modules",
+        "@npm//jasmine",
+    ],
+)
