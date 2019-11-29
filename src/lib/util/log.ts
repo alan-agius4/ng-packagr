@@ -2,6 +2,7 @@ import chalk from 'chalk';
 
 export const error = (err: string | Error) => {
   if (err instanceof Error) {
+    console.error(err)
     console.error(chalk.red('ERROR: ' + err.message));
 
     if (process.env.DEBUG) {
