@@ -5,7 +5,7 @@ export interface CacheEntry {
   exists?: boolean;
   sourceFile?: ts.SourceFile;
   content?: string;
-  declarationFileName?: string;
+  angularDiagnostics?: ts.Diagnostic[];
 }
 
 export class FileCache {

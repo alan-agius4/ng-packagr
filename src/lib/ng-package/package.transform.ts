@@ -1,5 +1,6 @@
 import { DepGraph } from 'dependency-graph';
 import {
+  EMPTY,
   NEVER,
   Observable,
   catchError,
@@ -11,7 +12,9 @@ import {
   from,
   map,
   of as observableOf,
+  of,
   pipe,
+  repeat,
   startWith,
   switchMap,
   takeLast,
@@ -19,7 +22,7 @@ import {
 } from 'rxjs';
 import { createFileWatch } from '../file-system/file-watcher';
 import { BuildGraph } from '../graph/build-graph';
-import { STATE_DIRTY, STATE_DONE, STATE_IN_PROGRESS } from '../graph/node';
+import { Node, STATE_DIRTY, STATE_DONE, STATE_IN_PROGRESS, STATE_PENDING } from '../graph/node';
 import { Transform } from '../graph/transform';
 import { colors } from '../utils/color';
 import { rmdir } from '../utils/fs';
@@ -28,12 +31,14 @@ import { ensureUnixPath } from '../utils/path';
 import { discoverPackages } from './discover-packages';
 import {
   EntryPointNode,
+  OutputFileCacheEntry,
   PackageNode,
   byEntryPoint,
   fileUrl,
   fileUrlPath,
   isEntryPoint,
-  isFileUrl,
+  isEntryPointDirty,
+  isEntryPointInProgress,
   isPackage,
   ngUrl,
 } from './nodes';
@@ -96,7 +101,7 @@ export const packageTransformFactory =
             ngPkg.cache.moduleResolutionCache,
           );
           node.data = { entryPoint, destinationFiles };
-          node.state = 'dirty';
+          node.state = STATE_DIRTY;
           ngPkg.dependsOn(node);
 
           return node;
@@ -128,70 +133,33 @@ const watchTransformFactory =
 
     return source$.pipe(
       switchMap(graph => {
-        const { data, cache } = graph.find(isPackage);
-        const { onFileChange, watcher } = createFileWatch([], [data.dest + '/'], options.poll);
+        const pkgNode = graph.find(isPackage);
+        const { onFileChange, watcher } = createFileWatch([], [pkgNode.data.dest + '/'], options.poll);
         graph.watcher = watcher;
 
         return onFileChange.pipe(
-          tap(fileChange => {
-            const { filePath } = fileChange;
-            const { sourcesFileCache } = cache;
-            const cachedSourceFile = sourcesFileCache.get(filePath);
-            const { declarationFileName } = cachedSourceFile || {};
-            const uriToClean = [filePath, declarationFileName].map(x => fileUrl(ensureUnixPath(x)));
-            const nodesToClean = graph.filter(node => uriToClean.some(uri => uri === node.url));
-
-            if (!nodesToClean.length) {
-              return;
-            }
-
-            const allNodesToClean = [
-              ...nodesToClean,
-              // if a non ts file changes we need to clean up its direct dependees
-              // this is mainly done for resources such as html and css
-              ...nodesToClean.filter(node => !node.url.endsWith('.ts')).flatMap(node => [...node.dependees]),
-            ];
-
-            // delete node that changes
-            for (const { url } of allNodesToClean) {
-              sourcesFileCache.delete(fileUrlPath(url));
-            }
-
-            const potentialStylesResources = new Set<string>();
-            for (const { url } of allNodesToClean) {
-              if (isFileUrl(url)) {
-                potentialStylesResources.add(fileUrlPath(url));
-              }
-            }
-
-            for (const entryPoint of graph.filter(isEntryPoint)) {
-              let isDirty = !!entryPoint.cache.stylesheetProcessor.invalidate(potentialStylesResources)?.length;
-              isDirty ||= allNodesToClean.some(dependent => entryPoint.dependents.has(dependent));
-
-              if (isDirty) {
-                entryPoint.state = STATE_DIRTY;
-
-                for (const url of uriToClean) {
-                  entryPoint.cache.analysesSourcesFileCache.delete(fileUrlPath(url));
-                }
-              }
-            }
-          }),
-          debounceTime(100),
+          tap(filePath => invalidateEntryPointsOnFileChange(graph, pkgNode, [filePath.filePath])),
+          debounceTime(200),
           tap(() => log.msg(FileChangeDetected)),
           startWith(undefined),
-          map(() => graph),
-        );
-      }),
-      switchMap(graph => {
-        return observableOf(graph).pipe(
-          buildTransformFactory(project, analyseSourcesTransform, entryPointTransform),
-          tap(() => log.msg(CompleteWaitingForFileChange)),
-          catchError(error => {
-            log.error(error);
-            log.msg(FailedWaitingForFileChange);
+          switchMap(() => {
+            return observableOf(graph).pipe(
+              buildTransformFactory(project, analyseSourcesTransform, entryPointTransform),
+              repeat({ delay: () => (graph.some(isEntryPointDirty()) ? of(1) : EMPTY) }),
+              filter(graph => !graph.some(isEntryPointDirty())),
+              tap(() => log.msg(CompleteWaitingForFileChange)),
+              catchError(error => {
+                const entryPoint = graph.find(isEntryPointInProgress());
+                if (entryPoint) {
+                  entryPoint.state = STATE_PENDING;
+                }
 
-            return NEVER;
+                log.error(error);
+                log.msg(FailedWaitingForFileChange);
+
+                return NEVER;
+              }),
+            );
           }),
         );
       }),
@@ -211,7 +179,34 @@ const buildTransformFactory =
       // Next, run through the entry point transformation (assets rendering, code compilation)
       scheduleEntryPoints(entryPointTransform),
       tap(graph => {
-        const ngPkg = graph.get(pkgUri);
+        const ngPkg = graph.get(pkgUri) as PackageNode;
+        const updatedNodes: OutputFileCacheEntry[] = [];
+        const updatedFiles = new Set<string>();
+        for (const node of graph.entries()) {
+          if (!isEntryPoint(node)) {
+            continue;
+          }
+
+          if (node.state !== STATE_DONE) {
+            continue;
+          }
+
+          for (const [filename, value] of node.cache.outputCache) {
+            updatedNodes.push(value);
+            if (value.updated && filename.endsWith('.d.ts') && !filename.endsWith('.map.d.ts')) {
+              updatedFiles.add(filename);
+            }
+          }
+        }
+
+        for (const entry of updatedNodes) {
+          entry.updated = false;
+        }
+
+        if (updatedFiles.size > 0 && invalidateEntryPointsOnFileChange(graph, ngPkg, updatedFiles)) {
+          return;
+        }
+
         log.success('\n------------------------------------------------------------------------------');
         log.success(`Built Angular Package
  - from: ${ngPkg.data.src}
@@ -269,3 +264,64 @@ const scheduleEntryPoints = (epTransform: Transform): Transform =>
       );
     }),
   );
+
+function invalidateEntryPointsOnFileChange(
+  graph: BuildGraph,
+  packageNode: PackageNode,
+  filePaths: string[] | Set<string>,
+): boolean {
+  const { sourcesFileCache } = packageNode.cache;
+  if (!sourcesFileCache) {
+    return false;
+  }
+
+  const allNodesToClean = new Set<Node>();
+  for (const filePath of filePaths) {
+    const cachedSourceFile = sourcesFileCache.get(filePath);
+    if (!cachedSourceFile) {
+      continue;
+    }
+
+    const uriToClean = fileUrl(ensureUnixPath(filePath));
+    const nodeToClean = graph.find(node => uriToClean === node.url);
+    if (!nodeToClean) {
+      continue;
+    }
+
+    // if a non ts file changes we need to clean up its direct dependees
+    // this is mainly done for resources such as html and css
+    if (!nodeToClean.url.endsWith('.ts')) {
+      for (const dependee of nodeToClean.dependees) {
+        allNodesToClean.add(dependee);
+      }
+    }
+
+    allNodesToClean.add(nodeToClean);
+  }
+
+  if (!allNodesToClean.size) {
+    return false;
+  }
+
+
+let hasDirtyEntryPoint = false;
+  for (const node of graph.values()) {
+    if (!isEntryPoint(node)) {
+      continue;
+    }
+
+    for (const dependent of allNodesToClean.values()) {
+      const uriToClean = fileUrlPath(dependent.url);
+      sourcesFileCache.delete(uriToClean);
+      const isDirty = node.dependents.has(dependent);
+
+      if (isDirty) {
+        node.state = STATE_DIRTY;
+        hasDirtyEntryPoint = true;
+        node.cache.analysesSourcesFileCache.delete(uriToClean);
+      }
+    }
+  }
+
+  return hasDirtyEntryPoint;
+}

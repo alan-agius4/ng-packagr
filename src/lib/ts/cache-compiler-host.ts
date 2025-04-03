@@ -116,24 +116,25 @@ export function cacheCompilerHost(
           }
         }
 
-        for (const source of sourceFiles) {
-          const cache = sourcesFileCache.getOrCreate(source.fileName);
-          if (!cache.declarationFileName) {
-            cache.declarationFileName = ensureUnixPath(fileName);
-          }
-        }
-
-        if (outputCache.get(fileName)?.content === data) {
+        const cachedOutput = outputCache.get(fileName);
+        if (cachedOutput?.content === data) {
           // Only emit files that changed content.
+          cachedOutput.updated = false;
+
           return;
         }
 
         outputCache.set(fileName, {
           content: data,
+          updated: true,
         });
       } else {
         fileName = fileName.replace(/\.js(\.map)?$/, '.mjs$1');
-        if (outputCache.get(fileName)?.content === data) {
+        const cachedOutput = outputCache.get(fileName);
+        if (cachedOutput?.content === data) {
+          // Only emit files that changed content.
+          cachedOutput.updated = false;
+
           return;
         }
 
@@ -142,11 +143,6 @@ export function cacheCompilerHost(
         const version = createHash('sha256').update(data).digest('hex');
 
         if (fileName.endsWith('.mjs')) {
-          if (outputCache.get(fileName)?.version === version) {
-            // Only emit changed files
-            return;
-          }
-
           map = convertSourceMap.fromComment(data).toJSON();
         }
 
@@ -154,6 +150,7 @@ export function cacheCompilerHost(
           content: data,
           version,
           map,
+          updated: true,
         });
       }
 

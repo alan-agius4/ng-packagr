@@ -57,7 +57,14 @@ export function ngUrl(path: string): string {
   return `${URL_PROTOCOL_NG}${path}`;
 }
 
-export type OutputFileCache = Map<string, { version?: string; content: string; map?: any }>;
+export interface OutputFileCacheEntry {
+  version?: string;
+  content: string;
+  map?: any;
+  updated?: boolean;
+}
+
+export type OutputFileCache = Map<string, OutputFileCacheEntry>;
 
 export class EntryPointNode extends Node {
   readonly type = TYPE_NG_ENTRY_POINT;
