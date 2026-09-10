@@ -8,6 +8,8 @@ import { StylesheetProcessor } from '../styles/stylesheet-processor';
 import { augmentProgramWithVersioning, cacheCompilerHost } from '../ts/cache-compiler-host';
 import * as log from '../utils/log';
 
+let ngCompilerCliPromise: Promise<typeof import('@angular/compiler-cli')> | undefined;
+
 export async function compileSourceFiles(
   graph: BuildGraph,
   tsConfig: ParsedConfiguration,
@@ -16,7 +18,7 @@ export async function compileSourceFiles(
   extraOptions?: Partial<CompilerOptions>,
   stylesheetProcessor?: StylesheetProcessor,
 ) {
-  const { NgtscProgram, formatDiagnostics } = await import('@angular/compiler-cli');
+  const { NgtscProgram, formatDiagnostics } = await (ngCompilerCliPromise ??= import('@angular/compiler-cli'));
   const { cacheDirectory, watch, cacheEnabled } = options;
   const tsConfigOptions: CompilerOptions = { ...tsConfig.options, ...extraOptions };
   const entryPoint = findEntryPointInProgress(graph);
@@ -145,12 +147,17 @@ export async function compileSourceFiles(
       continue;
     }
 
-    allDiagnostics.push(...builder.getSyntacticDiagnostics(sourceFile), ...builder.getSemanticDiagnostics(sourceFile));
-
-    // Declaration files cannot have declaration or template diagnostics
     if (sourceFile.isDeclarationFile) {
+      if (!tsConfigOptions.skipLibCheck) {
+        allDiagnostics.push(
+          ...builder.getSyntacticDiagnostics(sourceFile),
+          ...builder.getSemanticDiagnostics(sourceFile),
+        );
+      }
       continue;
     }
+
+    allDiagnostics.push(...builder.getSyntacticDiagnostics(sourceFile), ...builder.getSemanticDiagnostics(sourceFile));
 
     // Only request declaration diagnostics for affected or uncached files
     if (affectedFiles.has(sourceFile) || !declarationDiagnosticCache.has(sourceFile)) {
@@ -208,18 +215,6 @@ export async function compileSourceFiles(
     tsCompilerHost.writeFile(fileName, data, writeByteOrderMark, onError, sourceFiles);
   };
 
-  if ('getSemanticDiagnosticsOfNextAffectedFile' in builder) {
-    while (
-      builder.emitNextAffectedFile((fileName, data, writeByteOrderMark, onError, sourceFiles) => {
-        if (fileName.endsWith('.tsbuildinfo')) {
-          tsCompilerHost.writeFile(fileName, data, writeByteOrderMark, onError, sourceFiles);
-        }
-      })
-    ) {
-      // empty
-    }
-  }
-
   for (const sourceFile of builder.getSourceFiles()) {
     if (sourceFile.isDeclarationFile || ignoreForEmit.has(sourceFile)) {
       continue;
@@ -230,5 +225,9 @@ export async function compileSourceFiles(
     }
 
     builder.emit(sourceFile, writeFile, undefined, undefined, transformers);
+  }
+
+  if ('emitBuildInfo' in builder) {
+    (builder as any).emitBuildInfo(writeFile);
   }
 }
